@@ -1,32 +1,40 @@
 name: Build iOS (ipa)
 on:
+  workflow_dispatch:
   push:
     branches: [main, master]
-  workflow_dispatch:
 
 jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - name: Get ClassiClient source
+        uses: actions/checkout@v4
+        with:
+          repository: Hayden1204/ClassiClient
+          ref: master
 
-      - name: Verify repo is complete
+      - name: Patch iOS Makefile for arm64-only (Xcode 16 can't build armv7)
         run: |
-          echo "Files in src: $(find src -type f | wc -l)"
-          test -f src/Graphics.h || { echo "src/Graphics.h missing - incomplete upload, push with git instead"; exit 1; }
+          python3 - <<'PY'
+          p = 'misc/ios/Makefile'
+          s = open(p).read()
+          s = s.replace("all: $(BUILD_DIR_32) $(BUILD_DIR_64)", "all: $(BUILD_DIR_64)")
+          s = s.replace("$(BUILD_DIR_APP)/$(TARGET): $(BUILD_DIR_32)/$(TARGET) $(BUILD_DIR_64)/$(TARGET)",
+                        "$(BUILD_DIR_APP)/$(TARGET): $(BUILD_DIR_64)/$(TARGET)")
+          open(p, 'w').write(s)
+          PY
+          grep -n "^all:\|^\$(BUILD_DIR_APP)/\$(TARGET):" misc/ios/Makefile
 
       - name: Detect Xcode and iOS SDK
         run: |
           XCODE_DIR=$(xcode-select -p)
-          XCODE_APP=$(basename "$(dirname "$(dirname "$XCODE_DIR")")")
-          SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)
-          echo "XCODE_APP=$XCODE_APP" >> "$GITHUB_ENV"
-          echo "IOS_SDK_VERSION=$SDK_VERSION" >> "$GITHUB_ENV"
-          echo "Using $XCODE_APP with iOS SDK $SDK_VERSION"
+          echo "XCODE_APP=$(basename "$(dirname "$(dirname "$XCODE_DIR")")")" >> "$GITHUB_ENV"
+          echo "IOS_SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)" >> "$GITHUB_ENV"
 
       - name: Compile
-        run: make ios ARM64_ONLY=1 IOS_MIN_VERSION=12.0
+        run: make ios IOS_MIN_VERSION=12.0
 
       - uses: actions/upload-artifact@v4
         with:
