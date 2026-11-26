@@ -11,6 +11,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Verify repo is complete
+        run: |
+          echo "Files in src: $(find src -type f | wc -l)"
+          test -f src/Graphics.h || { echo "src/Graphics.h missing - incomplete upload, push with git instead"; exit 1; }
+
       - name: Detect Xcode and iOS SDK
         run: |
           XCODE_DIR=$(xcode-select -p)
