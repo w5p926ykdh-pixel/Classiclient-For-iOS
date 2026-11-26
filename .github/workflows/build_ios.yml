@@ -1,0 +1,30 @@
+name: Build iOS (ipa)
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect Xcode and iOS SDK
+        run: |
+          XCODE_DIR=$(xcode-select -p)
+          XCODE_APP=$(basename "$(dirname "$(dirname "$XCODE_DIR")")")
+          SDK_VERSION=$(xcrun --sdk iphoneos --show-sdk-version)
+          echo "XCODE_APP=$XCODE_APP" >> "$GITHUB_ENV"
+          echo "IOS_SDK_VERSION=$SDK_VERSION" >> "$GITHUB_ENV"
+          echo "Using $XCODE_APP with iOS SDK $SDK_VERSION"
+
+      - name: Compile
+        run: make ios ARM64_ONLY=1 IOS_MIN_VERSION=12.0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ClassiClient-iOS
+          path: ClassiCube-iPhoneOS.ipa
+          if-no-files-found: error
